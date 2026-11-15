@@ -502,3 +502,127 @@ def display_orders(orders):
               f"{order['item']:<20}{order['quantity']:>4}{order_total(order):>13,.0f}  "
               f"{order['order_date']:<11}{order['status']}")
     print(f"\n  {len(orders)} order(s) shown.")
+
+
+def ask_until_valid(prompt, parser):
+    """Keep asking until the parser accepts the answer, then return the clean value."""
+    while True:
+        raw = input(prompt)
+        try:
+            return parser(raw)
+        except ValueError as error:
+            print(f"  [!] {error}")
+
+
+def show_menu(role):
+    """Print the menu. The delete option is shown to admins only."""
+    print("\n------ RANGG ROOP ORDER PORTAL ------")
+    print("  1. Add new order")
+    print("  2. View all orders")
+    print("  3. Search orders")
+    print("  4. Update order status")
+    print("  5. Sales report")
+    if role == "admin":
+        print("  6. Delete an order (admin)")
+    print("  0. Exit")
+
+
+def prompt_add_order(orders, orders_file):
+    """Collect details from the user, add the order, and append it to the file."""
+    print("\nNew order (press Ctrl+C to cancel)")
+    name = ask_until_valid("  Customer name: ", lambda r: parse_text(r, "Customer name"))
+    city = ask_until_valid("  City: ", lambda r: parse_text(r, "City"))
+    item = ask_until_valid("  Item: ", lambda r: parse_text(r, "Item"))
+    quantity = ask_until_valid("  Quantity: ", parse_quantity)
+    price = ask_until_valid("  Unit price (PKR): ", parse_price)
+    today = datetime.now().strftime("%Y-%m-%d")
+    order_date = ask_until_valid(f"  Date [Enter = {today}]: ", lambda r: parse_date(r or today))
+    status = ask_until_valid("  Status [Pending/Delivered/Returned, Enter = Pending]: ",
+                             lambda r: parse_status(r or "Pending"))
+
+    order = add_record(orders, name, city, item, quantity, price, order_date, status)
+    if append_order(orders_file, order):
+        print(f"  Saved. New order ID: {order['order_id']}  (total PKR {order_total(order):,.0f})")
+    else:
+        print(f"  Order {order['order_id']} is in memory but was NOT saved to the file.")
+
+
+def prompt_search(orders):
+    """Ask for a keyword and show the matching orders."""
+    keyword = input("  Search (ID, customer, city, item or status): ")
+    results = search_record(orders, keyword)
+    if results:
+        display_orders(results)
+    else:
+        print("  No matching orders found.")
+
+
+def prompt_update_status(orders, orders_file):
+    """Ask for an order ID and a new status, then save the file."""
+    order_id = input("  Order ID to update (e.g. RR-004): ")
+    new_status = ask_until_valid("  New status [Pending/Delivered/Returned]: ", parse_status)
+    if update_status(orders, order_id, new_status):
+        saved = save_orders(orders_file, orders)
+        print("  Status updated and saved." if saved else "  Updated in memory only, file NOT saved.")
+    else:
+        print(f"  No order found with ID '{order_id.strip()}'.")
+
+
+def prompt_delete(orders, orders_file):
+    """Ask for an order ID, confirm, delete it, then save the file."""
+    order_id = input("  Order ID to delete: ")
+    order = find_order(orders, order_id)
+    if order is None:
+        print(f"  No order found with ID '{order_id.strip()}'.")
+        return
+    confirm = input(f"  Type YES to delete {order['order_id']} ({order['customer_name']}): ")
+    if confirm.strip() == "YES":
+        delete_record(orders, order['order_id'])
+        saved = save_orders(orders_file, orders)
+        print("  Order deleted and saved." if saved else "  Deleted in memory only, file NOT saved.")
+    else:
+        print("  Cancelled. Nothing was deleted.")
+
+
+def main(orders_file=ORDERS_FILE, users_file=USERS_FILE):
+    """Run the portal: login, then a menu loop until the user exits."""
+    print("=" * 40)
+    print("   RANGG ROOP ORDER PORTAL")
+    print("=" * 40)
+    try:
+        users = load_users(users_file)
+        session = user_login(users)
+        if session is None:
+            return
+        orders = load_orders(orders_file)
+
+        while True:
+            show_menu(session["role"])
+            choice = input("Choose an option: ").strip()
+
+            if choice == "1":
+                prompt_add_order(orders, orders_file)
+            elif choice == "2":
+                display_orders(orders)
+            elif choice == "3":
+                prompt_search(orders)
+            elif choice == "4":
+                prompt_update_status(orders, orders_file)
+            elif choice == "5":
+                print_report(generate_report(orders))
+            elif choice == "6" and session["role"] == "admin":
+                prompt_delete(orders, orders_file)
+            elif choice == "6":
+                print("  Only admins can delete orders.")
+            elif choice == "0":
+                break
+            else:
+                print("  Invalid choice. Please type a number from the menu.")
+    except (KeyboardInterrupt, EOFError):
+        print("\n  Input interrupted. Closing the portal.")
+    finally:
+        print("Session closed. Goodbye.")
+
+
+if __name__ == "__main__":
+    main()
