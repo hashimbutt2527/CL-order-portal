@@ -207,3 +207,139 @@ def user_login(users, max_attempts=3):
         print(f"  Wrong username or password. {remaining} attempt(s) left.")
     print("Too many failed attempts. Portal locked.")
     return None
+
+
+def parse_text(raw, label="Value"):
+    """Return trimmed text, or raise ValueError if it is empty."""
+    cleaned = str(raw).strip()
+    if not cleaned:
+        raise ValueError(f"{label} cannot be empty.")
+    return cleaned
+
+
+def parse_quantity(raw):
+    """Convert input to a whole number greater than zero, or raise ValueError."""
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        raise ValueError("Quantity must be a whole number, like 1 or 3.")
+    if value <= 0:
+        raise ValueError("Quantity must be greater than zero.")
+    return value
+
+
+def parse_price(raw):
+    """Convert input to a positive, finite number, or raise ValueError."""
+    try:
+        value = float(str(raw).strip().replace(",", ""))
+    except ValueError:
+        raise ValueError("Price must be a number, like 4500 or 1899.50.")
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError("Price must be a real number greater than zero.")
+    return value
+
+
+def parse_date(raw):
+    """Check a date is written as YYYY-MM-DD and return it, or raise ValueError."""
+    text = str(raw).strip()
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("Date must look like 2026-11-15 (year-month-day).")
+    return text
+
+
+def parse_status(raw):
+    """Match input to one of VALID_STATUSES (case-insensitive), or raise ValueError."""
+    text = str(raw).strip().lower()
+    for status in VALID_STATUSES:
+        if text == status.lower():
+            return status
+    raise ValueError("Status must be one of: " + ", ".join(VALID_STATUSES) + ".")
+
+
+def order_total(order):
+    """Return quantity x unit_price for one order."""
+    return order["quantity"] * order["unit_price"]
+
+
+def next_order_id(orders):
+    """Work out the next free order ID, such as 'RR-017'.
+
+    Args:
+        orders (list[dict]): current orders.
+
+    Returns:
+        str: ID one higher than the largest existing RR-number.
+    """
+    highest = 0
+    for order in orders:
+        try:
+            number = int(order["order_id"].split("-")[1])
+        except (IndexError, ValueError):
+            continue  # ignore IDs that don't follow the RR-### pattern
+        highest = max(highest, number)
+    return f"RR-{highest + 1:03d}"
+
+
+def add_record(orders, customer_name, city, item, quantity, unit_price,
+               order_date=None, status="Pending"):
+    """Validate the details and add a new order to the list.
+
+    Nothing is added unless every field is valid.
+
+    Args:
+        orders (list[dict]): current orders (modified in place).
+        customer_name, city, item (str): text fields.
+        quantity (int | str): number of units.
+        unit_price (float | str): price per unit in PKR.
+        order_date (str | None): YYYY-MM-DD, defaults to today.
+        status (str): one of VALID_STATUSES, defaults to "Pending".
+
+    Returns:
+        dict: the order that was added.
+
+    Raises:
+        ValueError: if any field is invalid.
+    """
+    if order_date is None:
+        order_date = datetime.now().strftime("%Y-%m-%d")
+
+    new_order = {
+        "order_id": next_order_id(orders),
+        "customer_name": parse_text(customer_name, "Customer name").title(),
+        "city": parse_text(city, "City").title(),
+        "item": parse_text(item, "Item"),
+        "quantity": parse_quantity(quantity),
+        "unit_price": parse_price(unit_price),
+        "order_date": parse_date(order_date),
+        "status": parse_status(status),
+    }
+    orders.append(new_order)
+    return new_order
+
+
+def search_record(orders, keyword):
+    """Find orders where the keyword appears in the ID, customer, city, item or status.
+
+    The search ignores upper/lower case, so 'lahore' finds 'Lahore'.
+
+    Args:
+        orders (list[dict]): current orders.
+        keyword (str): text to look for.
+
+    Returns:
+        list[dict]: matching orders (empty list if none, or if keyword is blank).
+    """
+    keyword = keyword.strip().lower()
+    if not keyword:
+        return []
+    matches = []
+    for order in orders:
+        searchable = [order["order_id"], order["customer_name"],
+                      order["city"], order["item"], order["status"]]
+        for value in searchable:
+            if keyword in value.lower():
+                matches.append(order)
+                break  # one hit is enough, avoid listing the same order twice
+    return matches
