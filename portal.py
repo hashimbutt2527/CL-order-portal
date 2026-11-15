@@ -343,3 +343,162 @@ def search_record(orders, keyword):
                 matches.append(order)
                 break  # one hit is enough, avoid listing the same order twice
     return matches
+
+
+def find_order(orders, order_id):
+    """Return the order with the given ID, or None if it does not exist."""
+    wanted = order_id.strip().upper()
+    for order in orders:
+        if order["order_id"].upper() == wanted:
+            return order
+    return None
+
+
+def update_status(orders, order_id, new_status):
+    """Change the status of one order.
+
+    Args:
+        orders (list[dict]): current orders (modified in place).
+        order_id (str): e.g. 'RR-004'.
+        new_status (str): one of VALID_STATUSES.
+
+    Returns:
+        bool: True if updated, False if no order has that ID.
+
+    Raises:
+        ValueError: if new_status is not a valid status.
+    """
+    new_status = parse_status(new_status)  # validate first
+    order = find_order(orders, order_id)
+    if order is None:
+        return False
+    order["status"] = new_status
+    return True
+
+
+def delete_record(orders, order_id):
+    """Remove one order from the list.
+
+    Returns:
+        bool: True if deleted, False if no order has that ID.
+    """
+    order = find_order(orders, order_id)
+    if order is None:
+        return False
+    orders.remove(order)
+    return True
+
+
+def top_entries(totals):
+    """Return the key with the highest value. If several tie, return all of them joined by ' / '.
+
+    A plain max() would silently pick the first tied key and hide the tie from the reader.
+
+    Args:
+        totals (dict): e.g. {"Lahore": 22100.0, "Karachi": 12400.0}
+
+    Returns:
+        str | None: the winning key(s), or None if the dictionary is empty.
+    """
+    if not totals:
+        return None
+    highest = max(totals.values())
+    winners = [key for key, value in totals.items() if value == highest]
+    return " / ".join(winners)
+
+
+def generate_report(orders):
+    """Calculate summary statistics for all orders.
+
+    Args:
+        orders (list[dict]): current orders.
+
+    Returns:
+        dict: total_orders, total_revenue, delivered_revenue, pending_revenue,
+        returned_value, return_rate_pct, avg_order_value, revenue_by_city,
+        units_by_item, orders_by_status, top_city, best_selling_item.
+    """
+    report = {
+        "total_orders": len(orders),
+        "total_revenue": 0.0,
+        "delivered_revenue": 0.0,
+        "pending_revenue": 0.0,
+        "returned_value": 0.0,
+        "return_rate_pct": 0.0,
+        "avg_order_value": 0.0,
+        "revenue_by_city": {},
+        "units_by_item": {},
+        "orders_by_status": {status: 0 for status in VALID_STATUSES},
+        "top_city": None,
+        "best_selling_item": None,
+    }
+
+    for order in orders:
+        total = order_total(order)
+        report["orders_by_status"][order["status"]] += 1
+
+        if order["status"] == "Returned":
+            report["returned_value"] += total
+            continue  # returned orders are not revenue
+
+        report["total_revenue"] += total
+        if order["status"] == "Delivered":
+            report["delivered_revenue"] += total
+        else:
+            report["pending_revenue"] += total
+
+        city = order["city"]
+        report["revenue_by_city"][city] = report["revenue_by_city"].get(city, 0.0) + total
+        item = order["item"]
+        report["units_by_item"][item] = report["units_by_item"].get(item, 0) + order["quantity"]
+
+    kept_orders = report["total_orders"] - report["orders_by_status"]["Returned"]
+    if report["total_orders"] > 0:
+        report["return_rate_pct"] = report["orders_by_status"]["Returned"] / report["total_orders"] * 100
+    if kept_orders > 0:
+        report["avg_order_value"] = report["total_revenue"] / kept_orders
+    report["top_city"] = top_entries(report["revenue_by_city"])
+    report["best_selling_item"] = top_entries(report["units_by_item"])
+    return report
+
+
+def print_report(report):
+    """Print the dictionary from generate_report() in a readable layout."""
+    print("\n" + "=" * 52)
+    print("  RANGG ROOP - SALES REPORT")
+    print("=" * 52)
+    print(f"  Total orders           : {report['total_orders']}")
+    print(f"  Total revenue          : PKR {report['total_revenue']:,.0f}")
+    print(f"    - Delivered          : PKR {report['delivered_revenue']:,.0f}")
+    print(f"    - Pending            : PKR {report['pending_revenue']:,.0f}")
+    print(f"  Returned (not counted) : PKR {report['returned_value']:,.0f}")
+    print(f"  Return rate            : {report['return_rate_pct']:.1f}%")
+    print(f"  Average order value    : PKR {report['avg_order_value']:,.0f}")
+    print("\n  Orders by status:")
+    for status, count in report["orders_by_status"].items():
+        print(f"    {status:<10} {count}")
+    print("\n  Revenue by city (highest first):")
+    ranked = sorted(report["revenue_by_city"].items(), key=lambda pair: pair[1], reverse=True)
+    for city, revenue in ranked:
+        print(f"    {city:<12} PKR {revenue:>10,.0f}")
+    print("\n  Units sold by item (highest first):")
+    ranked = sorted(report["units_by_item"].items(), key=lambda pair: pair[1], reverse=True)
+    for item, units in ranked:
+        print(f"    {item:<20} {units}")
+    print(f"\n  Top city          : {report['top_city']}")
+    print(f"  Best-selling item : {report['best_selling_item']}")
+    print("=" * 52)
+
+
+def display_orders(orders):
+    """Print a list of orders as a table, with a count at the bottom."""
+    if not orders:
+        print("  (no orders to show)")
+        return
+    print(f"\n  {'ID':<8}{'Customer':<18}{'City':<12}{'Item':<20}{'Qty':>4}{'Total (PKR)':>13}  {'Date':<11}{'Status'}")
+    print("  " + "-" * 98)
+    for order in orders:
+        print(f"  {order['order_id']:<8}{order['customer_name']:<18}{order['city']:<12}"
+              f"{order['item']:<20}{order['quantity']:>4}{order_total(order):>13,.0f}  "
+              f"{order['order_date']:<11}{order['status']}")
+    print(f"\n  {len(orders)} order(s) shown.")
