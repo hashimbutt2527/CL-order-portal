@@ -6,7 +6,7 @@ All data is saved in CSV files, so nothing is lost when the program closes.
 
 Built in pure Python (standard library only) for **Assignment 3: End-to-End Portal Design**.
 
-**Team:** [Member 1 name, 25L-XXXX] and [Member 2 name, 25L-XXXX]
+**Team:** [Muhammad Hashim Butt, 25L-5241] and [Muhammad Mohsin, 25L-5020]
 
 ---
 
