@@ -115,3 +115,95 @@ def load_orders(filename):
     finally:
         print(f"  [load] {len(orders)} order(s) loaded, {skipped} skipped.")
     return orders
+
+
+def hash_password(password):
+    """Turn a password into a SHA-256 hash string.
+
+    Args:
+        password (str): the plain-text password.
+
+    Returns:
+        str: 64-character hexadecimal hash.
+    """
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def default_users():
+    """Return the two starter accounts used when users.csv does not exist yet."""
+    return [
+        {"username": "admin", "password_hash": hash_password("admin123"), "role": "admin"},
+        {"username": "staff", "password_hash": hash_password("staff123"), "role": "staff"},
+    ]
+
+
+def load_users(filename):
+    """Read user accounts from a CSV file.
+
+    If the file is missing, it is created with the default accounts.
+
+    Args:
+        filename (str): path of the users CSV file.
+
+    Returns:
+        list[dict]: accounts with keys username, password_hash, role.
+    """
+    users = []
+    try:
+        with open(filename, newline="", encoding="utf-8") as file:
+            for row in csv.DictReader(file):
+                users.append({field: (row.get(field) or "").strip() for field in USER_FIELDS})
+    except FileNotFoundError:
+        print(f"  [info] '{filename}' not found. Creating it with default accounts.")
+        users = default_users()
+        try:
+            with open(filename, "w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=USER_FIELDS)
+                writer.writeheader()
+                writer.writerows(users)
+        except (PermissionError, OSError) as error:
+            print(f"  [warning] Could not save '{filename}': {error}. Using defaults in memory only.")
+    except PermissionError:
+        print(f"  [error] No permission to read '{filename}'.")
+    return users
+
+
+def check_credentials(users, username, password):
+    """Check a username and password against the stored accounts.
+
+    Args:
+        users (list[dict]): accounts from load_users().
+        username (str): typed username.
+        password (str): typed plain-text password.
+
+    Returns:
+        str | None: the account's role ("admin" or "staff") if correct, otherwise None.
+    """
+    typed_hash = hash_password(password)
+    for user in users:
+        if user["username"] == username.strip() and user["password_hash"] == typed_hash:
+            return user["role"]
+    return None
+
+
+def user_login(users, max_attempts=3):
+    """Ask for a username and password, allowing a limited number of attempts.
+
+    Args:
+        users (list[dict]): accounts from load_users().
+        max_attempts (int): how many tries before giving up.
+
+    Returns:
+        dict | None: {"username": ..., "role": ...} on success, None if all attempts fail.
+    """
+    for attempt in range(1, max_attempts + 1):
+        username = input("Username: ")
+        password = input("Password: ")
+        role = check_credentials(users, username, password)
+        if role is not None:
+            print(f"\nWelcome, {username.strip()} ({role}).")
+            return {"username": username.strip(), "role": role}
+        remaining = max_attempts - attempt
+        print(f"  Wrong username or password. {remaining} attempt(s) left.")
+    print("Too many failed attempts. Portal locked.")
+    return None
