@@ -1,0 +1,17 @@
+order_id,customer_name,city,item,quantity,unit_price,order_date,status
+RR-001,Ayesha Khan,Lahore,Lawn 3-Piece,2,4500.0,2026-10-20,Delivered
+RR-002,Hira Malik,Karachi,Embroidered Kurta,1,3800.0,2026-10-22,Delivered
+RR-003,Sana Tariq,Islamabad,Khaddar Shawl,1,3200.0,2026-10-24,Delivered
+RR-004,Maryam Iqbal,Lahore,Chiffon Dupatta,3,1800.0,2026-10-27,Delivered
+RR-005,Fatima Noor,Gujranwala,Lawn 3-Piece,1,4500.0,2026-10-29,Returned
+RR-006,Zainab Ali,Faisalabad,Cotton Trouser,2,1500.0,2026-10-31,Delivered
+RR-007,Areeba Shah,Multan,Printed Kurti,2,2200.0,2026-11-02,Delivered
+RR-008,Ayesha Khan,Lahore,Khaddar Shawl,1,3200.0,2026-11-03,Delivered
+RR-009,Noor Fatima,Rawalpindi,Lawn 3-Piece,3,4500.0,2026-11-05,Pending
+RR-010,Laiba Raza,Karachi,Printed Kurti,1,2200.0,2026-11-06,Delivered
+RR-011,Hina Aslam,Peshawar,Embroidered Kurta,2,3800.0,2026-11-07,Returned
+RR-012,Sana Tariq,Islamabad,Chiffon Dupatta,2,1800.0,2026-11-08,Pending
+RR-013,Mehwish Butt,Lahore,Lawn 3-Piece,1,4500.0,2026-11-09,Pending
+RR-014,Rabia Siddiqui,Gujranwala,Cotton Trouser,4,1500.0,2026-11-10,Pending
+RR-015,Hira Malik,Karachi,Khaddar Shawl,2,3200.0,2026-11-11,Pending
+RR-016,Amna Waheed,Faisalabad,Printed Kurti,3,2200.0,2026-11-12,Pending
